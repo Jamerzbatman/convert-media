@@ -139,7 +139,6 @@ def convert_file(src_path):
         print(f"✅ Converted successfully: {new_name}")
         os.remove(src_path)
         os.replace(temp_output, final_output)
-        trigger_plex_scan(2)
         return True
     except subprocess.CalledProcessError:
         print(f"❌ Conversion failed: {src_path}")
