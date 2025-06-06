@@ -172,7 +172,7 @@ def scan_and_convert(directory, library_section_id):
                 if convert_file(full_path):
                     trigger_plex_scan(library_section_id)
                     time.sleep(10)
-#something differant
+# something different
 
 if __name__ == "__main__":
     while True:
