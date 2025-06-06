@@ -110,11 +110,28 @@ def clean_filename(original_name):
     return base + ".mp4"
 
 
-def convert_file(src_path):
+def convert_file(src_path, info=None):
+    if info is None:
+        info = get_media_info(src_path)
+
     parent_dir = os.path.dirname(src_path)
     new_name = clean_filename(os.path.basename(src_path))
     temp_output = os.path.join(parent_dir, "__converted_temp__.mp4")
     final_output = os.path.join(parent_dir, new_name)
+
+    # Determine audio channel count for bitrate selection
+    audio_channels = 2
+    try:
+        if info:
+            for stream in info.get("streams", []):
+                if stream.get("codec_type") == "audio":
+                    audio_channels = int(stream.get("channels", audio_channels))
+                    break
+    except Exception as e:
+        print(f"⚠️ Could not determine channel count: {e}")
+
+    # Adjust bitrate based on number of channels
+    audio_bitrate = "160k" if audio_channels <= 2 else "384k"
 
     # 🔥 Delete temp file if it already exists
     if os.path.exists(temp_output):
@@ -128,7 +145,8 @@ def convert_file(src_path):
     cmd = [
         "ffmpeg", "-i", src_path,
         "-c:v", FFMPEG_VIDEO_CODEC, "-preset", "medium", "-crf", CRF,
-        "-c:a", FFMPEG_AUDIO_CODEC, "-b:a", "160k",
+        "-c:a", FFMPEG_AUDIO_CODEC, "-b:a", audio_bitrate,
+        "-ac", str(audio_channels),
         "-movflags", "+faststart",
         temp_output
     ]
@@ -168,7 +186,7 @@ def scan_and_convert(directory, library_section_id):
             info = get_media_info(full_path)
             print(full_path, is_compatible(info))
             if info and not is_compatible(info):
-                if convert_file(full_path):
+                if convert_file(full_path, info):
                     trigger_plex_scan(library_section_id)
                     time.sleep(10)
 # something different
