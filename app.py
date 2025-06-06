@@ -189,11 +189,10 @@ def scan_and_convert(directory, library_section_id):
                 if convert_file(full_path, info):
                     trigger_plex_scan(library_section_id)
                     time.sleep(10)
-# something different
 
 if __name__ == "__main__":
     while True:
-        #scan_and_convert(TvShows, 2)
+        scan_and_convert(TvShows, 2)
         scan_and_convert(Movie, 1)
         time.sleep(1500)
         print("\n✅ All incompatible files processed.")
