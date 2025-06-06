@@ -6,6 +6,7 @@ from pathlib import Path
 import requests
 import time
 import platform
+import argparse
 
 # Determine platform-safe paths
 if platform.system() == "Windows":
@@ -23,6 +24,7 @@ ALLOWED_CONTAINERS = {"mp4", "mkv"}
 # Conversion settings
 FFMPEG_VIDEO_CODEC = "libx264"
 FFMPEG_AUDIO_CODEC = "aac"
+FFMPEG_AUDIO_BITRATE = "160k"
 CRF = "23"
 
 # Plex settings
@@ -110,7 +112,7 @@ def clean_filename(original_name):
     return base + ".mp4"
 
 
-def convert_file(src_path):
+def convert_file(src_path, copy_audio=False, audio_bitrate=FFMPEG_AUDIO_BITRATE):
     parent_dir = os.path.dirname(src_path)
     new_name = clean_filename(os.path.basename(src_path))
     temp_output = os.path.join(parent_dir, "__converted_temp__.mp4")
@@ -125,10 +127,17 @@ def convert_file(src_path):
             print(f"❌ Could not remove existing temp file: {e}")
             return False
 
+    info = get_media_info(src_path)
+    audio_streams = [s for s in info.get("streams", []) if s.get("codec_type") == "audio"] if info else []
+    if copy_audio and audio_streams and audio_streams[0].get("codec_name") in ALLOWED_AUDIO_CODECS:
+        audio_args = ["-c:a", "copy"]
+    else:
+        audio_args = ["-c:a", FFMPEG_AUDIO_CODEC, "-b:a", audio_bitrate]
+
     cmd = [
         "ffmpeg", "-i", src_path,
         "-c:v", FFMPEG_VIDEO_CODEC, "-preset", "medium", "-crf", CRF,
-        "-c:a", FFMPEG_AUDIO_CODEC, "-b:a", "160k",
+        *audio_args,
         "-movflags", "+faststart",
         temp_output
     ]
@@ -147,7 +156,7 @@ def convert_file(src_path):
             os.remove(temp_output)
         return False
 
-def scan_and_convert(directory, library_section_id):
+def scan_and_convert(directory, library_section_id, copy_audio=False, audio_bitrate=FFMPEG_AUDIO_BITRATE):
     now = time.time()
     one_hour = 60 * 60
 
@@ -169,15 +178,22 @@ def scan_and_convert(directory, library_section_id):
             info = get_media_info(full_path)
             print(full_path, is_compatible(info))
             if info and not is_compatible(info):
-                if convert_file(full_path):
+                if convert_file(full_path, copy_audio=copy_audio, audio_bitrate=audio_bitrate):
                     trigger_plex_scan(library_section_id)
                     time.sleep(10)
 #something differant
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Convert media for Roku playback")
+    parser.add_argument("--audio-bitrate", default=FFMPEG_AUDIO_BITRATE,
+                        help="Audio bitrate when re-encoding (e.g., 320k)")
+    parser.add_argument("--copy-audio", action="store_true",
+                        help="Copy audio stream if codec is already supported")
+    args = parser.parse_args()
+
     while True:
-        #scan_and_convert(TvShows, 2)
-        scan_and_convert(Movie, 1)
+        #scan_and_convert(TvShows, 2, copy_audio=args.copy_audio, audio_bitrate=args.audio_bitrate)
+        scan_and_convert(Movie, 1, copy_audio=args.copy_audio, audio_bitrate=args.audio_bitrate)
         time.sleep(1500)
         print("\n✅ All incompatible files processed.")
  
